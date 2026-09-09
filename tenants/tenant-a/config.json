@@ -1,0 +1,7 @@
+{
+  "tenant": "tenant-a",
+  "namespace": "tenant-a",
+  "clusterURL": "https://kubernetes.default.svc",
+  "imageTag": "1.25.0",
+  "replicas": "1"
+}

@@ -1,0 +1,46 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: tenants
+  namespace: argocd
+spec:
+  # Automatically create/delete ArgoCD Applications when tenant folders are added/removed
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+
+  generators:
+    - git:
+        repoURL: "https://github.com/YOUR_ORG/YOUR_REPO.git"   # <-- replace this
+        revision: main
+        files:
+          - path: "tenants/*/config.json"
+
+  template:
+    metadata:
+      # Application name = tenant name (e.g. "tenant-a")
+      name: "{{.tenant}}"
+      namespace: argocd
+      annotations:
+        # Useful for tracing which config file drove this Application
+        app.kubernetes.io/managed-by: applicationset
+    spec:
+      project: default
+
+      source:
+        repoURL: "https://github.com/YOUR_ORG/YOUR_REPO.git"   # <-- replace this
+        targetRevision: main
+        # Points to the tenant-specific Kustomize overlay
+        path: "overlays/{{.tenant}}"
+
+      destination:
+        server: "{{.clusterURL}}"
+        namespace: "{{.namespace}}"
+
+      syncPolicy:
+        # Automatically sync when git changes
+        automated:
+          prune: true       # delete resources removed from git
+          selfHeal: true    # revert manual cluster changes
+        syncOptions:
+          - CreateNamespace=true   # create the tenant namespace if missing
+          - ServerSideApply=true

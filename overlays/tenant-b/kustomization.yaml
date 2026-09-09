@@ -1,0 +1,37 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: tenant-b
+
+resources:
+  - ../../base
+
+# Pin tenant-b to nginx v1.1 (newer version)
+images:
+  - name: nginx
+    newTag: "1.25.3"
+
+# Tenant-specific labels on all resources
+commonLabels:
+  tenant: tenant-b
+
+# Scale to 2 replicas for tenant-b
+replicas:
+  - name: demo-app
+    count: 2
+
+patches:
+  - patch: |-
+      - op: replace
+        path: /metadata/name
+        value: demo-app-tenant-b
+    target:
+      kind: Deployment
+      name: demo-app
+  - patch: |-
+      - op: replace
+        path: /metadata/name
+        value: demo-app-tenant-b
+    target:
+      kind: Service
+      name: demo-app
