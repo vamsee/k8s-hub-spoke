@@ -106,9 +106,8 @@ login_argocd() {
 }
 
 register_spoke() {
-  log "Registering spoke cluster (${SPOKE_CLUSTER}) with ArgoCD hub..."
-  argocd cluster add "kind-${SPOKE_CLUSTER}" --yes
-  ok "Spoke cluster registered."
+  log "Creating and registering spoke cluster (${SPOKE_CLUSTER})..."
+  ./scripts/add-kind-spoke.sh "${SPOKE_CLUSTER}"
 }
 
 apply_applicationset() {
@@ -146,17 +145,13 @@ print_summary() {
   echo "  ArgoCD UI  → https://localhost:${ARGOCD_PORT}"
   echo ""
   echo "  Useful commands:"
-  echo "    kubectl config use-context kind-${HUB_CLUSTER}"
   echo "    argocd app list"
-  echo "    kubectl get pods -n tenant-a"
-  echo "    kubectl get pods -n tenant-b"
+  echo "    kubectl --context kind-${SPOKE_CLUSTER} get pods -n tenant-a"
+  echo "    kubectl --context kind-${SPOKE_CLUSTER} get pods -n tenant-b"
   echo ""
-  echo "  To add a new tenant:"
-  echo "    1. mkdir -p tenants/tenant-c overlays/tenant-c"
-  echo "    2. Copy and edit tenants/tenant-a/config.json"
-  echo "    3. Copy and edit overlays/tenant-a/kustomization.yaml"
-  echo "    4. git add . && git commit -m 'add tenant-c' && git push"
-  echo "    5. ArgoCD will auto-sync within ~3 minutes"
+  echo "  To add a second spoke:"
+  echo "    ./scripts/add-kind-spoke.sh tenant-cluster-2"
+  echo "  Then follow README.md to add tenant-c to that spoke."
   echo ""
 }
 
@@ -164,7 +159,6 @@ print_summary() {
 main() {
   check_prereqs
   create_cluster "$HUB_CLUSTER"
-  create_cluster "$SPOKE_CLUSTER"
   install_argocd
   login_argocd
   register_spoke

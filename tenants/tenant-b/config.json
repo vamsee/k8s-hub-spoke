@@ -1,8 +1,8 @@
 {
   "tenant": "tenant-b",
   "namespace": "tenant-b",
-  "clusterURL": "https://kubernetes.default.svc",
-  "clusterName": "kind-hub",
+  "clusterURL": "https://tenant-cluster-1-control-plane:6443",
+  "clusterName": "kind-tenant-cluster-1",
   "imageTag": "1.25.3",
   "replicas": "2"
 }

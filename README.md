@@ -1,202 +1,128 @@
-# Multi-Tenant GitOps Demo
+# Multi-tenant GitOps with Kind and Argo CD
 
-Local proof-of-concept for managing multiple microservice versions across tenants using
-**kind** + **ArgoCD ApplicationSets** + **Kustomize overlays**.
+A local demo of a hub-and-spoke GitOps setup:
 
-## Repo structure
+- **Hub**: `kind-hub` runs Argo CD only.
+- **Spoke 1**: `kind-tenant-cluster-1` runs `tenant-a` and `tenant-b`.
+- **Spoke 2**: added later with one command; it runs `tenant-c`.
 
-```
-.
-├── base/                          # Shared Kubernetes manifests
-│   ├── deployment.yaml
-│   ├── service.yaml
-│   └── kustomization.yaml
-│
-├── overlays/                      # Per-tenant version pins
-│   ├── tenant-a/
-│   │   └── kustomization.yaml     # nginx:1.25.0, 1 replica
-│   └── tenant-b/
-│       └── kustomization.yaml     # nginx:1.25.3, 2 replicas
-│
-├── tenants/                       # ApplicationSet generator source of truth
-│   ├── tenant-a/config.json
-│   └── tenant-b/config.json
-│
-├── argocd/
-│   └── applicationset.yaml        # Auto-generates one ArgoCD App per tenant
-│
-├── setup.sh                       # Bootstrap clusters + ArgoCD
-└── teardown.sh                    # Clean up everything
-```
+Argo CD reads each tenant's configuration from Git and deploys its Kustomize
+overlay to the selected spoke cluster.
 
 ## Prerequisites
 
 ```bash
 brew install kind kubectl helm argocd
-brew install --cask docker    # if not installed
+brew install --cask docker
 ```
 
-Ensure Docker Desktop is running before proceeding.
-
-## Quick start
-
-### 1. Push this repo to GitHub
-
-ArgoCD needs a remote git URL to poll for changes.
+Start Docker Desktop, then push this repository to a remote Git repository.
+Argo CD must be able to read that repository.
 
 ```bash
-git init
-git add .
-git commit -m "initial multi-tenant gitops setup"
 git remote add origin https://github.com/YOUR_ORG/YOUR_REPO.git
 git push -u origin main
 ```
 
-### 2. Run setup
+## 1. Bootstrap the hub and first spoke
 
 ```bash
 REPO_URL=https://github.com/YOUR_ORG/YOUR_REPO.git ./setup.sh
 ```
 
-This will:
-- Create two kind clusters: `hub` and `tenant-cluster-1`
-- Install ArgoCD on the hub
-- Register the spoke cluster with ArgoCD
-- Apply the ApplicationSet (if `REPO_URL` is set)
+The script creates the hub, installs and logs in to Argo CD, creates spoke 1,
+and registers it with the hub. It also applies the ApplicationSet, so
+`tenant-a` and `tenant-b` deploy to spoke 1 automatically.
 
-Setup takes ~3–4 minutes depending on your internet connection.
+Open Argo CD at <https://localhost:8080>. The bootstrap output prints the
+initial admin password.
 
-### 3. Open the ArgoCD UI
-
-```bash
-# Port-forward is started automatically by setup.sh, but you can restart it:
-kubectl port-forward svc/argocd-server -n argocd 8080:443
-```
-
-Open **https://localhost:8080** in your browser.  
-The initial credentials are printed at the end of `setup.sh`.
-
-### 4. Watch tenants sync
+## 2. Verify the first spoke
 
 ```bash
-# List all ArgoCD applications
+argocd cluster list
 argocd app list
 
-# Check pods for each tenant
-kubectl config use-context kind-hub
-kubectl get pods -n tenant-a
-kubectl get pods -n tenant-b
+kubectl --context kind-tenant-cluster-1 get pods -n tenant-a
+kubectl --context kind-tenant-cluster-1 get pods -n tenant-b
 ```
 
-You should see `tenant-a` running `nginx:1.25.0` and `tenant-b` running `nginx:1.25.3`.
+The applications should target:
 
-## Verify the overlay diff
-
-You can preview what Kustomize will render for each tenant without applying anything:
-
-```bash
-kubectl kustomize overlays/tenant-a
-kubectl kustomize overlays/tenant-b
+```
+https://tenant-cluster-1-control-plane:6443
 ```
 
-## Upgrade a tenant's version
+The hub does not run tenant workloads.
 
-1. Edit `overlays/tenant-b/kustomization.yaml` and change the `newTag`
-2. Commit and push
-3. ArgoCD auto-syncs within ~3 minutes (or click **Sync** in the UI)
+## 3. Add the second spoke
+
+Keep the Argo CD port-forward and CLI login created by `setup.sh` running,
+then run:
 
 ```bash
-# Trigger a manual sync immediately
-argocd app sync tenant-b
+./scripts/add-kind-spoke.sh tenant-cluster-2
 ```
 
-## Add a new tenant
+The helper creates the Kind cluster when needed, creates the Argo CD service
+account and RBAC, and registers the Docker-network API endpoint that is
+reachable from the hub. Re-running it is safe.
+
+## 4. Put tenant-c on the second spoke
 
 ```bash
-# 1. Create the config
 mkdir -p tenants/tenant-c overlays/tenant-c
-
-cat > tenants/tenant-c/config.json <<EOF
-{
-  "tenant": "tenant-c",
-  "namespace": "tenant-c",
-  "clusterURL": "https://kubernetes.default.svc",
-  "imageTag": "1.26.0",
-  "replicas": "1"
-}
-EOF
-
-# 2. Create the overlay
+cp tenants/tenant-a/config.json tenants/tenant-c/config.json
 cp overlays/tenant-a/kustomization.yaml overlays/tenant-c/kustomization.yaml
-# Edit overlays/tenant-c/kustomization.yaml to set namespace: tenant-c and desired imageTag
-
-# 3. Push — ArgoCD does the rest
-git add .
-git commit -m "add tenant-c"
-git push
 ```
 
-## Add a new cluster
+Edit `tenants/tenant-c/config.json`:
 
-```bash
-# 1. Create a new kind cluster
-kind create cluster --name tenant-cluster-2 --wait 60s
-
-# 2. Verify it appears in your contexts
-kubectl config get-contexts
-kind get clusters
-
-# 3. Register it with ArgoCD (run from kind-hub context)
-kubectl config use-context kind-hub
-argocd cluster add kind-tenant-cluster-2 --yes
-
-# 4. Verify ArgoCD can see it
-argocd cluster list
-```
-
-You'll see the new cluster's API server URL in the output of `argocd cluster list`.
-Copy that URL — you'll need it as the `clusterURL` when adding tenants to this cluster.
-
-```bash
-# Example: deploy tenant-c onto the new cluster
-mkdir -p tenants/tenant-c overlays/tenant-c
-
-cat > tenants/tenant-c/config.json <<EOF
+```json
 {
   "tenant": "tenant-c",
   "namespace": "tenant-c",
-  "clusterURL": "<paste URL from argocd cluster list>",
+  "clusterURL": "https://tenant-cluster-2-control-plane:6443",
   "clusterName": "kind-tenant-cluster-2",
   "imageTag": "1.26.0",
   "replicas": "1"
 }
-EOF
+```
 
-cp overlays/tenant-a/kustomization.yaml overlays/tenant-c/kustomization.yaml
-# Edit overlays/tenant-c/kustomization.yaml — update namespace and imageTag
+Edit `overlays/tenant-c/kustomization.yaml` so its namespace, labels, and
+resource names use `tenant-c`; set the desired image tag and replica count.
+Then commit and push:
 
-git add .
-git commit -m "add tenant-c on cluster-2"
+```bash
+git add tenants/tenant-c overlays/tenant-c
+git commit -m "add tenant-c on spoke 2"
 git push
 ```
 
-ArgoCD will pick up the new tenant config and deploy it to `kind-tenant-cluster-2` automatically.
-
-## Tear down
+Argo CD creates the `tenant-c` Application and deploys it to spoke 2.
 
 ```bash
-./teardown.sh          # prompts for confirmation
-./teardown.sh --yes    # skips prompt
+argocd app get tenant-c
+kubectl --context kind-tenant-cluster-2 get pods -n tenant-c
 ```
 
-## Translating to EKS
+## Useful commands
 
-| Local (kind)               | Production (EKS)                              |
-|----------------------------|-----------------------------------------------|
-| `kind create cluster`      | `eksctl create cluster` / Terraform           |
-| `kind-hub`                 | Dedicated EKS cluster for ArgoCD              |
-| `kind-tenant-cluster-1`    | Per-region or per-tenant EKS cluster          |
-| `https://kubernetes.default.svc` | EKS API server endpoint (from kubeconfig) |
-| `argocd cluster add`       | Same command, pointing at EKS context         |
+```bash
+# Render a tenant overlay locally
+kubectl kustomize overlays/tenant-a
 
-Everything else — the overlays, ApplicationSet, and tenant config structure — is identical.
+# Trigger a sync without waiting for the Git poll
+argocd app sync tenant-c
+
+# Remove the hub and every project spoke (`tenant-cluster-*`)
+./teardown.sh --yes
+```
+
+## Local Kind networking
+
+Kind writes `127.0.0.1:<port>` into your local kubeconfig. That address works
+from your Mac, but not from Argo CD running inside the hub cluster. The helper
+uses `https://<spoke>-control-plane:6443`, the shared Docker-network address,
+instead. This is specific to the local Kind demo; production clusters should
+use their normal reachable API endpoints.
