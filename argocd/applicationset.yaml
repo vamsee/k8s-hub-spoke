@@ -23,6 +23,10 @@ spec:
       annotations:
         # Useful for tracing which config file drove this Application
         app.kubernetes.io/managed-by: applicationset
+      labels:
+        # Visible in the ArgoCD UI as a filter/tag
+        tenant: "{{.tenant}}"
+        cluster: "{{.clusterName}}"
     spec:
       project: default
 

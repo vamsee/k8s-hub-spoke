@@ -2,6 +2,7 @@
   "tenant": "tenant-b",
   "namespace": "tenant-b",
   "clusterURL": "https://kubernetes.default.svc",
+  "clusterName": "kind-hub",
   "imageTag": "1.25.3",
   "replicas": "2"
 }

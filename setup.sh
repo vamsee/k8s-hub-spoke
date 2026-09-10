@@ -13,17 +13,21 @@ set -euo pipefail
 HUB_CLUSTER="hub"
 SPOKE_CLUSTER="tenant-cluster-1"
 ARGOCD_NAMESPACE="argocd"
-ARGOCD_VERSION="stable"   # pin to a specific tag like "v2.11.0" for reproducibility
+ARGOCD_VERSION="stable" # pin to a specific tag like "v2.11.0" for reproducibility
 ARGOCD_PORT="8080"
 
 # If REPO_URL is not set, remind the user but continue (useful for dry runs)
-REPO_URL="${REPO_URL:-}"
+# REPO_URL="${REPO_URL:-}"
+REPO_URL="https://github.com/vamsee/k8s-hub-spoke"
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
-log()  { echo -e "\n\033[1;34m▶ $*\033[0m"; }
-ok()   { echo -e "\033[1;32m✔ $*\033[0m"; }
+log() { echo -e "\n\033[1;34m▶ $*\033[0m"; }
+ok() { echo -e "\033[1;32m✔ $*\033[0m"; }
 warn() { echo -e "\033[1;33m⚠ $*\033[0m"; }
-die()  { echo -e "\033[1;31m✘ $*\033[0m"; exit 1; }
+die() {
+  echo -e "\033[1;31m✘ $*\033[0m"
+  exit 1
+}
 
 check_prereqs() {
   log "Checking prerequisites..."
@@ -62,7 +66,8 @@ install_argocd() {
 
   kubectl create namespace "$ARGOCD_NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
 
-  kubectl apply -n "$ARGOCD_NAMESPACE" \
+  # Use server-side apply to avoid the 262144-byte annotation limit on ArgoCD CRDs
+  kubectl apply -n "$ARGOCD_NAMESPACE" --server-side \
     -f "https://raw.githubusercontent.com/argoproj/argo-cd/${ARGOCD_VERSION}/manifests/install.yaml"
 
   log "Waiting for ArgoCD server to become ready (up to 3 minutes)..."
@@ -81,7 +86,7 @@ login_argocd() {
   kubectl port-forward svc/argocd-server \
     -n "$ARGOCD_NAMESPACE" "${ARGOCD_PORT}:443" &>/dev/null &
 
-  sleep 3   # give port-forward a moment to bind
+  sleep 3 # give port-forward a moment to bind
 
   local password
   password=$(argocd admin initial-password -n "$ARGOCD_NAMESPACE" 2>/dev/null | head -1)
@@ -122,8 +127,8 @@ apply_applicationset() {
   fi
 
   # Substitute placeholder URL and apply
-  sed "s|https://github.com/YOUR_ORG/YOUR_REPO.git|${REPO_URL}|g" "$appset_file" \
-    | kubectl apply -n "$ARGOCD_NAMESPACE" -f -
+  sed "s|https://github.com/YOUR_ORG/YOUR_REPO.git|${REPO_URL}|g" "$appset_file" |
+    kubectl apply -n "$ARGOCD_NAMESPACE" -f -
 
   ok "ApplicationSet applied. ArgoCD will sync tenants shortly."
 }
