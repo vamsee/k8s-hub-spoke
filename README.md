@@ -128,6 +128,43 @@ argocd app get tenant-c
 kubectl --context kind-tenant-cluster-2 get pods -n tenant-c
 ```
 
+## Check nginx in your browser
+
+Once the tenant pods are ready, run each port-forward in its own terminal.
+Keep those terminals open while testing; port 8080 remains reserved for Argo CD.
+
+```bash
+# Tenant-a: http://localhost:8081
+kubectl --context kind-tenant-cluster-1 -n tenant-a \
+  port-forward svc/demo-app-tenant-a 8081:80
+
+# Tenant-b: http://localhost:8082
+kubectl --context kind-tenant-cluster-1 -n tenant-b \
+  port-forward svc/demo-app-tenant-b 8082:80
+
+# Tenant-c (after adding spoke 2): http://localhost:8083
+kubectl --context kind-tenant-cluster-2 -n tenant-c \
+  port-forward svc/demo-app-tenant-c 8083:80
+```
+
+Open the corresponding URL in your browser to see the nginx welcome page.
+In another terminal, inspect the HTTP `Server` header to check the nginx version:
+
+```bash
+curl -sSI http://localhost:8081 | grep -i '^server:'
+curl -sSI http://localhost:8082 | grep -i '^server:'
+curl -sSI http://localhost:8083 | grep -i '^server:'
+```
+
+For example, tenant-a may return `Server: nginx/1.25.5`. The version should
+match `images[].newTag` in the deployed tenant overlay. A customized nginx
+configuration can hide the version from this header.
+
+Press Ctrl+C in each port-forward terminal when finished.
+
+Or you could just go to ArgoCD -> Applications -> tenant-c -> hover over pod
+to see the deployed image version.
+
 ## Useful commands
 
 ```bash
