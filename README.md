@@ -2,12 +2,34 @@
 
 A local demo of a hub-and-spoke GitOps setup:
 
-- **Hub**: `kind-hub` runs Argo CD only.
-- **Spoke 1**: `kind-tenant-cluster-1` runs `tenant-a` and `tenant-b`.
-- **Spoke 2**: added later with one command; it runs `tenant-c`.
+```mermaid
+flowchart TB
+    git[Git repository]
+
+    subgraph hub["kind-hub"]
+        argocd[Argo CD]
+        applicationset[ApplicationSet]
+        argocd --> applicationset
+    end
+
+    subgraph spoke1["kind-tenant-cluster-1"]
+        tenant_a[tenant-a]
+        tenant_b[tenant-b]
+    end
+
+    subgraph spoke2["kind-tenant-cluster-2 (added later)"]
+        tenant_c[tenant-c]
+    end
+
+    git --> applicationset
+    applicationset --> tenant_a
+    applicationset --> tenant_b
+    applicationset --> tenant_c
+```
 
 Argo CD reads each tenant's configuration from Git and deploys its Kustomize
-overlay to the selected spoke cluster.
+overlay to the selected spoke cluster. Spoke 1 is `kind-tenant-cluster-1`;
+spoke 2 is `kind-tenant-cluster-2`.
 
 ## Prerequisites
 
