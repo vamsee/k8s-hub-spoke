@@ -12,8 +12,10 @@ images:
     newTag: "1.25.5"
 
 # Tenant-specific labels on all resources
-commonLabels:
-  tenant: tenant-a
+labels:
+  - pairs:
+      tenant: tenant-a
+    includeSelectors: true
 
 # Scale down for demo purposes
 replicas:

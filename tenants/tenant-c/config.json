@@ -1,0 +1,6 @@
+{
+  "tenant": "tenant-c",
+  "namespace": "tenant-c",
+  "clusterURL": "https://tenant-cluster-2-control-plane:6443",
+  "clusterName": "kind-tenant-cluster-2"
+}

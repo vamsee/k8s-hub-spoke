@@ -105,14 +105,14 @@ Edit `tenants/tenant-c/config.json`:
   "tenant": "tenant-c",
   "namespace": "tenant-c",
   "clusterURL": "https://tenant-cluster-2-control-plane:6443",
-  "clusterName": "kind-tenant-cluster-2",
-  "imageTag": "1.26.0",
-  "replicas": "1"
+  "clusterName": "kind-tenant-cluster-2"
 }
 ```
 
 Edit `overlays/tenant-c/kustomization.yaml` so its namespace, labels, and
-resource names use `tenant-c`; set the desired image tag and replica count.
+resource names use `tenant-c`; set the desired image tag under `images[].newTag`
+and replica count under `replicas[].count`. The tenant JSON selects the deployment
+destination; the Kustomize overlay controls image versions and scaling.
 Then commit and push:
 
 ```bash
