@@ -136,6 +136,52 @@ git commit -m "add tenant-c"
 git push
 ```
 
+## Add a new cluster
+
+```bash
+# 1. Create a new kind cluster
+kind create cluster --name tenant-cluster-2 --wait 60s
+
+# 2. Verify it appears in your contexts
+kubectl config get-contexts
+kind get clusters
+
+# 3. Register it with ArgoCD (run from kind-hub context)
+kubectl config use-context kind-hub
+argocd cluster add kind-tenant-cluster-2 --yes
+
+# 4. Verify ArgoCD can see it
+argocd cluster list
+```
+
+You'll see the new cluster's API server URL in the output of `argocd cluster list`.
+Copy that URL — you'll need it as the `clusterURL` when adding tenants to this cluster.
+
+```bash
+# Example: deploy tenant-c onto the new cluster
+mkdir -p tenants/tenant-c overlays/tenant-c
+
+cat > tenants/tenant-c/config.json <<EOF
+{
+  "tenant": "tenant-c",
+  "namespace": "tenant-c",
+  "clusterURL": "<paste URL from argocd cluster list>",
+  "clusterName": "kind-tenant-cluster-2",
+  "imageTag": "1.26.0",
+  "replicas": "1"
+}
+EOF
+
+cp overlays/tenant-a/kustomization.yaml overlays/tenant-c/kustomization.yaml
+# Edit overlays/tenant-c/kustomization.yaml — update namespace and imageTag
+
+git add .
+git commit -m "add tenant-c on cluster-2"
+git push
+```
+
+ArgoCD will pick up the new tenant config and deploy it to `kind-tenant-cluster-2` automatically.
+
 ## Tear down
 
 ```bash
