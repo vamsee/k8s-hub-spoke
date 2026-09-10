@@ -49,8 +49,11 @@ kubectl --context "${CONTEXT}" create clusterrolebinding argocd-spoke-manager-cl
   --dry-run=client -o yaml | kubectl --context "${CONTEXT}" apply -f - >/dev/null
 
 TOKEN="$(kubectl --context "${CONTEXT}" -n kube-system create token argocd-manager --duration=8760h)"
-CA_DATA="$(kubectl config view --raw --context "${CONTEXT}" \
+# --context selects a context but does not filter the clusters array.
+# Minify first so clusters[0] is always this spoke, even when the hub is first.
+CA_DATA="$(kubectl config view --raw --minify --context "${CONTEXT}" \
   -o jsonpath='{.clusters[0].cluster.certificate-authority-data}')"
+[[ -n "${CA_DATA}" ]] || die "No CA certificate found for '${CONTEXT}'."
 CLUSTER_SECRET="$(kubectl --context "kind-${HUB_CLUSTER}" -n "${ARGOCD_NAMESPACE}" get secrets \
   -l argocd.argoproj.io/secret-type=cluster \
   -o go-template='{{range .items}}{{.metadata.name}}{{"\t"}}{{index .data "name" | base64decode}}{{"\n"}}{{end}}' \

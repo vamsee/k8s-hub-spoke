@@ -70,7 +70,11 @@ install_argocd() {
   kubectl apply -n "$ARGOCD_NAMESPACE" --server-side \
     -f "https://raw.githubusercontent.com/argoproj/argo-cd/${ARGOCD_VERSION}/manifests/install.yaml"
 
-  log "Waiting for ArgoCD server to become ready (up to 3 minutes)..."
+  log "Waiting for ArgoCD and ApplicationSet support to become ready (up to 3 minutes)..."
+  kubectl wait --for=condition=Established --timeout=180s \
+    crd/applicationsets.argoproj.io
+  kubectl wait --for=condition=available --timeout=180s \
+    deployment/argocd-applicationset-controller -n "$ARGOCD_NAMESPACE"
   kubectl wait --for=condition=available --timeout=180s \
     deployment/argocd-server -n "$ARGOCD_NAMESPACE"
 
@@ -106,6 +110,7 @@ login_argocd() {
 }
 
 register_spoke() {
+  # Always reconcile credentials, including the spoke CA, on setup reruns.
   log "Creating and registering spoke cluster (${SPOKE_CLUSTER})..."
   ./scripts/add-kind-spoke.sh "${SPOKE_CLUSTER}"
 }
