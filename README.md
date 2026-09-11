@@ -185,3 +185,10 @@ from your Mac, but not from Argo CD running inside the hub cluster. The helper
 uses `https://<spoke>-control-plane:6443`, the shared Docker-network address,
 instead. This is specific to the local Kind demo; production clusters should
 use their normal reachable API endpoints.
+
+## Tenant data and performance isolation
+
+For the proposed production design, see [Tenant isolation and performance
+acceptance testing](docs/tenant-isolation.md). It covers database isolation,
+per-tenant capacity, and testing that a busy tenant does not degrade others.
+These are design considerations beyond the current nginx/Kind demo.
