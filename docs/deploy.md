@@ -10,7 +10,7 @@ describe how to extend that workflow; they are not provisioned by `setup.sh`.
 ## 1. Build and publish the microservice
 
 ```mermaid
-flowchart LR
+flowchart TB
     developer["Developer"] -->|Push application code| source["Microservice Git repository"]
     source -->|Trigger CI| tests["Check out commit and run tests"]
     tests -->|Tests pass| build["Build Docker image"]
