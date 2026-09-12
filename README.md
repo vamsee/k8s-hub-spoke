@@ -77,6 +77,10 @@ https://tenant-cluster-1-control-plane:6443
 
 The hub does not run tenant workloads.
 
+For the end-to-end microservice workflow, see [Build an image and deploy it to
+a tenant](docs/deploy.md), with diagrams covering CI → ECR and Git → Argo CD →
+the selected spoke and tenant namespace.
+
 ## 3. Add the second spoke
 
 Keep the Argo CD port-forward and CLI login created by `setup.sh` running,
