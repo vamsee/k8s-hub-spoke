@@ -47,15 +47,31 @@ flowchart TB
 
     subgraph hub["Hub cluster: kind-hub"]
         appset["ApplicationSet: tenants"]
+        app_a["Application: tenant-a"]
+        app_b["Application: tenant-b"]
         app["Application: tenant-c"]
         render["Argo CD renders overlays/tenant-c with Kustomize"]
         sync["Argo CD compares and syncs desired manifests"]
         appset -->|Create or update| app
+        appset -->|Manage existing tenant| app_a
+        appset -->|Manage existing tenant| app_b
         app --> render --> sync
     end
 
     git -->|tenants/*/config.json| appset
     git -->|base and tenant overlay| render
+
+    subgraph spoke1["Spoke 1: kind-tenant-cluster-1 - existing workloads"]
+        subgraph tenant_a["Namespace: tenant-a"]
+            workload_a["Deployment and Service: demo-app-tenant-a"]
+        end
+        subgraph tenant_b["Namespace: tenant-b"]
+            workload_b["Deployment and Service: demo-app-tenant-b"]
+        end
+    end
+
+    app_a -->|Argo CD renders overlays/tenant-a and syncs| workload_a
+    app_b -->|Argo CD renders overlays/tenant-b and syncs| workload_b
 
     subgraph spoke["Spoke 2: kind-tenant-cluster-2"]
         api["Kubernetes API"]
@@ -75,6 +91,8 @@ flowchart TB
 
 The ApplicationSet reads tenant JSON files and creates or updates one
 Application per tenant. Each Application tracks its overlay on `main`.
+Spoke 1 shows the existing tenant-a and tenant-b workloads for context; the
+tenant-c image change in this example deploys only to tenant-c on spoke 2.
 Changing an existing tenant's image requires only an overlay change, not a new
 Application. See the [Argo CD Git file generator documentation](https://argo-cd.readthedocs.io/en/stable/operator-manual/applicationset/Generators-Git/).
 
