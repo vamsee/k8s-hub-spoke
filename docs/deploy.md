@@ -50,42 +50,50 @@ flowchart TB
         app_a["Application: tenant-a"]
         app_b["Application: tenant-b"]
         app["Application: tenant-c"]
+        render_existing["Argo CD renders overlays/tenant-a and overlays/tenant-b"]
         render["Argo CD renders overlays/tenant-c with Kustomize"]
         sync["Argo CD compares and syncs desired manifests"]
         appset -->|Create or update| app
         appset -->|Manage existing tenant| app_a
         appset -->|Manage existing tenant| app_b
+        app_a --> render_existing
+        app_b --> render_existing
+        render_existing --> sync
         app --> render --> sync
     end
 
     git -->|tenants/*/config.json| appset
     git -->|base and tenant overlay| render
 
-    subgraph spoke1["Spoke 1: kind-tenant-cluster-1 - existing workloads"]
-        subgraph tenant_a["Namespace: tenant-a"]
-            workload_a["Deployment and Service: demo-app-tenant-a"]
+    subgraph spokes["Workload spoke clusters"]
+        direction LR
+        subgraph spoke1["Spoke 1: kind-tenant-cluster-1 - existing workloads"]
+            api1["Kubernetes API"]
+            subgraph tenant_a["Namespace: tenant-a"]
+                workload_a["Deployment and Service: demo-app-tenant-a"]
+            end
+            subgraph tenant_b["Namespace: tenant-b"]
+                workload_b["Deployment and Service: demo-app-tenant-b"]
+            end
+            api1 --> workload_a
+            api1 --> workload_b
         end
-        subgraph tenant_b["Namespace: tenant-b"]
-            workload_b["Deployment and Service: demo-app-tenant-b"]
+
+        subgraph spoke["Spoke 2: kind-tenant-cluster-2"]
+            api["Kubernetes API"]
+            runtime["Node container runtime"]
+            subgraph tenant["Namespace: tenant-c"]
+                workload["Deployment and Service: demo-app-tenant-c"]
+                pods["Microservice pods"]
+            end
+            api --> workload
+            workload -->|Schedule pods| runtime
+            runtime -->|Start containers| pods
         end
     end
 
-    app_a -->|Argo CD renders overlays/tenant-a and syncs| workload_a
-    app_b -->|Argo CD renders overlays/tenant-b and syncs| workload_b
-
-    subgraph spoke["Spoke 2: kind-tenant-cluster-2"]
-        api["Kubernetes API"]
-        runtime["Node container runtime"]
-        subgraph tenant["Namespace: tenant-c"]
-            workload["Deployment and Service: demo-app-tenant-c"]
-            pods["Microservice pods"]
-        end
-        api --> workload
-        workload -->|Schedule pods| runtime
-        runtime -->|Start containers| pods
-    end
-
-    sync -->|Apply to selected cluster and namespace| api
+    sync -->|Reconcile tenant-a and tenant-b| api1
+    sync -->|Apply tenant-c update| api
     runtime -->|Authenticated image pull| ecr["Amazon ECR: published orders image"]
 ```
 
